@@ -43,30 +43,24 @@
 #include <pcl_conversions/pcl_conversions.h>
 
 //register this planner as a BaseGlobalPlanner plugin
-PLUGINLIB_EXPORT_CLASS(navfn::NavfnROS, nav_core::BaseGlobalPlanner)
+PLUGINLIB_DECLARE_CLASS(navfn, NavfnROS, navfn::NavfnROS, nav_core::BaseGlobalPlanner)
 
 namespace navfn {
 
   NavfnROS::NavfnROS() 
-    : costmap_(NULL),  planner_(), initialized_(false), allow_unknown_(true) {}
+    : costmap_ros_(NULL),  planner_(), initialized_(false), allow_unknown_(true) {}
 
-  NavfnROS::NavfnROS(std::string name, costmap_2d::Costmap2DROS* costmap_ros)
-    : costmap_(NULL),  planner_(), initialized_(false), allow_unknown_(true) {
+  NavfnROS::NavfnROS(std::string name, costmap_2d::Costmap2DROS* costmap_ros) 
+    : costmap_ros_(NULL),  planner_(), initialized_(false), allow_unknown_(true) {
       //initialize the planner
       initialize(name, costmap_ros);
   }
 
-  NavfnROS::NavfnROS(std::string name, costmap_2d::Costmap2D* costmap, std::string global_frame)
-    : costmap_(NULL),  planner_(), initialized_(false), allow_unknown_(true) {
-      //initialize the planner
-      initialize(name, costmap, global_frame);
-  }
-
-  void NavfnROS::initialize(std::string name, costmap_2d::Costmap2D* costmap, std::string global_frame){
+  void NavfnROS::initialize(std::string name, costmap_2d::Costmap2DROS* costmap_ros){
     if(!initialized_){
-      costmap_ = costmap;
-      global_frame_ = global_frame;
-      planner_ = boost::shared_ptr<NavFn>(new NavFn(costmap_->getSizeInCellsX(), costmap_->getSizeInCellsY()));
+      costmap_ros_ = costmap_ros;
+      costmap_2d::Costmap2D* costmap = costmap_ros_->getCostmap();
+      planner_ = boost::shared_ptr<NavFn>(new NavFn(costmap->getSizeInCellsX(), costmap->getSizeInCellsY()));
 
       ros::NodeHandle private_nh("~/" + name);
 
@@ -95,10 +89,6 @@ namespace navfn {
       ROS_WARN("This planner has already been initialized, you can't call it twice, doing nothing");
   }
 
-  void NavfnROS::initialize(std::string name, costmap_2d::Costmap2DROS* costmap_ros){
-    initialize(name, costmap_ros->getCostmap(), costmap_ros->getGlobalFrameID());
-  }
-
   bool NavfnROS::validPointPotential(const geometry_msgs::Point& world_point){
     return validPointPotential(world_point, default_tolerance_);
   }
@@ -109,7 +99,7 @@ namespace navfn {
       return false;
     }
 
-    double resolution = costmap_->getResolution();
+    double resolution = costmap_ros_->getCostmap()->getResolution();
     geometry_msgs::Point p;
     p = world_point;
 
@@ -137,7 +127,7 @@ namespace navfn {
     }
 
     unsigned int mx, my;
-    if(!costmap_->worldToMap(world_point.x, world_point.y, mx, my))
+    if(!costmap_ros_->getCostmap()->worldToMap(world_point.x, world_point.y, mx, my))
       return DBL_MAX;
 
     unsigned int index = my * planner_->nx + mx;
@@ -149,13 +139,15 @@ namespace navfn {
       ROS_ERROR("This planner has not been initialized yet, but it is being used, please call initialize() before use");
       return false;
     }
+    
+    costmap_2d::Costmap2D* costmap = costmap_ros_->getCostmap();
 
     //make sure to resize the underlying array that Navfn uses
-    planner_->setNavArr(costmap_->getSizeInCellsX(), costmap_->getSizeInCellsY());
-    planner_->setCostmap(costmap_->getCharMap(), true, allow_unknown_);
+    planner_->setNavArr(costmap->getSizeInCellsX(), costmap->getSizeInCellsY());
+    planner_->setCostmap(costmap->getCharMap(), true, allow_unknown_);
 
     unsigned int mx, my;
-    if(!costmap_->worldToMap(world_point.x, world_point.y, mx, my))
+    if(!costmap->worldToMap(world_point.x, world_point.y, mx, my))
       return false;
 
     int map_start[2];
@@ -179,21 +171,22 @@ namespace navfn {
     }
 
     //set the associated costs in the cost map to be free
-    costmap_->setCost(mx, my, costmap_2d::FREE_SPACE);
+    costmap_ros_->getCostmap()->setCost(mx, my, costmap_2d::FREE_SPACE);
   }
 
   bool NavfnROS::makePlanService(nav_msgs::GetPlan::Request& req, nav_msgs::GetPlan::Response& resp){
     makePlan(req.start, req.goal, resp.plan.poses);
 
     resp.plan.header.stamp = ros::Time::now();
-    resp.plan.header.frame_id = global_frame_;
+    resp.plan.header.frame_id = costmap_ros_->getGlobalFrameID();
 
     return true;
   } 
 
   void NavfnROS::mapToWorld(double mx, double my, double& wx, double& wy) {
-    wx = costmap_->getOriginX() + mx * costmap_->getResolution();
-    wy = costmap_->getOriginY() + my * costmap_->getResolution();
+    costmap_2d::Costmap2D* costmap = costmap_ros_->getCostmap();
+    wx = costmap->getOriginX() + mx * costmap->getResolution();
+    wy = costmap->getOriginY() + my * costmap->getResolution();
   }
 
   bool NavfnROS::makePlan(const geometry_msgs::PoseStamped& start, 
@@ -213,17 +206,19 @@ namespace navfn {
     plan.clear();
 
     ros::NodeHandle n;
+    costmap_2d::Costmap2D* costmap = costmap_ros_->getCostmap();
+    std::string global_frame = costmap_ros_->getGlobalFrameID();
 
     //until tf can handle transforming things that are way in the past... we'll require the goal to be in our global frame
-    if(tf::resolve(tf_prefix_, goal.header.frame_id) != tf::resolve(tf_prefix_, global_frame_)){
+    if(tf::resolve(tf_prefix_, goal.header.frame_id) != tf::resolve(tf_prefix_, global_frame)){
       ROS_ERROR("The goal pose passed to this planner must be in the %s frame.  It is instead in the %s frame.", 
-                tf::resolve(tf_prefix_, global_frame_).c_str(), tf::resolve(tf_prefix_, goal.header.frame_id).c_str());
+                tf::resolve(tf_prefix_, global_frame).c_str(), tf::resolve(tf_prefix_, goal.header.frame_id).c_str());
       return false;
     }
 
-    if(tf::resolve(tf_prefix_, start.header.frame_id) != tf::resolve(tf_prefix_, global_frame_)){
+    if(tf::resolve(tf_prefix_, start.header.frame_id) != tf::resolve(tf_prefix_, global_frame)){
       ROS_ERROR("The start pose passed to this planner must be in the %s frame.  It is instead in the %s frame.", 
-                tf::resolve(tf_prefix_, global_frame_).c_str(), tf::resolve(tf_prefix_, start.header.frame_id).c_str());
+                tf::resolve(tf_prefix_, global_frame).c_str(), tf::resolve(tf_prefix_, start.header.frame_id).c_str());
       return false;
     }
 
@@ -231,7 +226,7 @@ namespace navfn {
     double wy = start.pose.position.y;
 
     unsigned int mx, my;
-    if(!costmap_->worldToMap(wx, wy, mx, my)){
+    if(!costmap->worldToMap(wx, wy, mx, my)){
       ROS_WARN("The robot's start position is off the global costmap. Planning will always fail, are you sure the robot has been properly localized?");
       return false;
     }
@@ -241,9 +236,27 @@ namespace navfn {
     tf::poseStampedMsgToTF(start, start_pose);
     clearRobotCell(start_pose, mx, my);
 
+#if 0
+    {
+      static int n = 0;
+      static char filename[1000];
+      snprintf( filename, 1000, "navfnros-makeplan-costmapB-%04d.pgm", n++ );
+      costmap->saveRawMap( std::string( filename ));
+    }
+#endif
+
     //make sure to resize the underlying array that Navfn uses
-    planner_->setNavArr(costmap_->getSizeInCellsX(), costmap_->getSizeInCellsY());
-    planner_->setCostmap(costmap_->getCharMap(), true, allow_unknown_);
+    planner_->setNavArr(costmap->getSizeInCellsX(), costmap->getSizeInCellsY());
+    planner_->setCostmap(costmap->getCharMap(), true, allow_unknown_);
+
+#if 0
+    {
+      static int n = 0;
+      static char filename[1000];
+      snprintf( filename, 1000, "navfnros-makeplan-costmapC-%04d", n++ );
+      planner_->savemap( filename );
+    }
+#endif
 
     int map_start[2];
     map_start[0] = mx;
@@ -252,7 +265,7 @@ namespace navfn {
     wx = goal.pose.position.x;
     wy = goal.pose.position.y;
 
-    if(!costmap_->worldToMap(wx, wy, mx, my)){
+    if(!costmap->worldToMap(wx, wy, mx, my)){
       if(tolerance <= 0.0){
         ROS_WARN_THROTTLE(1.0, "The goal sent to the navfn planner is off the global costmap. Planning will always fail to this goal.");
         return false;
@@ -271,7 +284,7 @@ namespace navfn {
     //bool success = planner_->calcNavFnAstar();
     planner_->calcNavFnDijkstra(true);
 
-    double resolution = costmap_->getResolution();
+    double resolution = costmap->getResolution();
     geometry_msgs::PoseStamped p, best_pose;
     p = goal;
 
@@ -311,7 +324,7 @@ namespace navfn {
     if (visualize_potential_){
       //publish potential array
       pcl::PointCloud<PotarrPoint> pot_area;
-      pot_area.header.frame_id = global_frame_;
+      pot_area.header.frame_id = global_frame;
       pot_area.points.clear();
       std_msgs::Header header;
       pcl_conversions::fromPCL(pot_area.header, header);
@@ -371,14 +384,17 @@ namespace navfn {
       ROS_ERROR("This planner has not been initialized yet, but it is being used, please call initialize() before use");
       return false;
     }
+    
+    costmap_2d::Costmap2D* costmap = costmap_ros_->getCostmap();
+    std::string global_frame = costmap_ros_->getGlobalFrameID();
 
     //clear the plan, just in case
     plan.clear();
 
     //until tf can handle transforming things that are way in the past... we'll require the goal to be in our global frame
-    if(tf::resolve(tf_prefix_, goal.header.frame_id) != tf::resolve(tf_prefix_, global_frame_)){
+    if(tf::resolve(tf_prefix_, goal.header.frame_id) != tf::resolve(tf_prefix_, global_frame)){
       ROS_ERROR("The goal pose passed to this planner must be in the %s frame.  It is instead in the %s frame.", 
-                tf::resolve(tf_prefix_, global_frame_).c_str(), tf::resolve(tf_prefix_, goal.header.frame_id).c_str());
+                tf::resolve(tf_prefix_, global_frame).c_str(), tf::resolve(tf_prefix_, goal.header.frame_id).c_str());
       return false;
     }
 
@@ -387,7 +403,7 @@ namespace navfn {
 
     //the potential has already been computed, so we won't update our copy of the costmap
     unsigned int mx, my;
-    if(!costmap_->worldToMap(wx, wy, mx, my)){
+    if(!costmap->worldToMap(wx, wy, mx, my)){
       ROS_WARN_THROTTLE(1.0, "The goal sent to the navfn planner is off the global costmap. Planning will always fail to this goal.");
       return false;
     }
@@ -398,7 +414,7 @@ namespace navfn {
 
     planner_->setStart(map_goal);
 
-    planner_->calcPath(costmap_->getSizeInCellsX() * 4);
+    planner_->calcPath(costmap->getSizeInCellsX() * 4);
 
     //extract the plan
     float *x = planner_->getPathX();
@@ -413,7 +429,7 @@ namespace navfn {
 
       geometry_msgs::PoseStamped pose;
       pose.header.stamp = plan_time;
-      pose.header.frame_id = global_frame_;
+      pose.header.frame_id = global_frame;
       pose.pose.position.x = world_x;
       pose.pose.position.y = world_y;
       pose.pose.position.z = 0.0;

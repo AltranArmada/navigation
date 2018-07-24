@@ -45,7 +45,7 @@
 #include <angles/angles.h>
 
 #include <ros/ros.h>
-#include <tf2/utils.h>
+
 #include <pcl_conversions/pcl_conversions.h>
 
 namespace dwa_local_planner {
@@ -62,17 +62,17 @@ namespace dwa_local_planner {
         sim_period_);
 
     double resolution = planner_util_->getCostmap()->getResolution();
-    pdist_scale_ = resolution * config.path_distance_bias;
+    pdist_scale_ = config.path_distance_bias;
     // pdistscale used for both path and alignment, set  forward_point_distance to zero to discard alignment
-    path_costs_.setScale(pdist_scale_);
-    alignment_costs_.setScale(pdist_scale_);
+    path_costs_.setScale(resolution * pdist_scale_ * 0.5);
+    alignment_costs_.setScale(resolution * pdist_scale_ * 0.5);
 
-    gdist_scale_ = resolution * config.goal_distance_bias;
-    goal_costs_.setScale(gdist_scale_);
-    goal_front_costs_.setScale(gdist_scale_);
+    gdist_scale_ = config.goal_distance_bias;
+    goal_costs_.setScale(resolution * gdist_scale_ * 0.5);
+    goal_front_costs_.setScale(resolution * gdist_scale_ * 0.5);
 
     occdist_scale_ = config.occdist_scale;
-    obstacle_costs_.setScale(occdist_scale_);
+    obstacle_costs_.setScale(resolution * occdist_scale_);
 
     stop_time_buffer_ = config.stop_time_buffer;
     oscillation_costs_.setOscillationResetDist(config.oscillation_reset_dist, config.oscillation_reset_angle);
@@ -81,9 +81,7 @@ namespace dwa_local_planner {
     alignment_costs_.setXShift(forward_point_distance_);
  
     // obstacle costs can vary due to scaling footprint feature
-    obstacle_costs_.setParams(config.max_vel_trans, config.max_scaling_factor, config.scaling_speed);
-
-    twirling_costs_.setScale(config.twirling_scale);
+    obstacle_costs_.setParams(config.max_trans_vel, config.max_scaling_factor, config.scaling_speed);
 
     int vx_samp, vy_samp, vth_samp;
     vx_samp = config.vx_samples;
@@ -173,7 +171,6 @@ namespace dwa_local_planner {
     critics.push_back(&alignment_costs_); // prefers trajectories that keep the robot nose on nose path
     critics.push_back(&path_costs_); // prefers trajectories on global path
     critics.push_back(&goal_costs_); // prefers trajectories that go towards (local) goal, based on wave propagation
-    critics.push_back(&twirling_costs_); // optionally prefer trajectories that don't spin
 
     // trajectory generators
     std::vector<base_local_planner::TrajectorySampleGenerator*> generator_list;
@@ -196,9 +193,10 @@ namespace dwa_local_planner {
       return false;
     }
 
+    double resolution = planner_util_->getCostmap()->getResolution();
     total_cost =
-        pdist_scale_ * path_cost +
-        gdist_scale_ * goal_cost +
+        pdist_scale_ * resolution * path_cost +
+        gdist_scale_ * resolution * goal_cost +
         occdist_scale_ * occ_cost;
     return true;
   }
@@ -219,13 +217,15 @@ namespace dwa_local_planner {
     oscillation_costs_.resetOscillationFlags();
     base_local_planner::Trajectory traj;
     geometry_msgs::PoseStamped goal_pose = global_plan_.back();
-    Eigen::Vector3f goal(goal_pose.pose.position.x, goal_pose.pose.position.y, tf2::getYaw(goal_pose.pose.orientation));
+    Eigen::Vector3f goal(goal_pose.pose.position.x, goal_pose.pose.position.y, tf::getYaw(goal_pose.pose.orientation));
     base_local_planner::LocalPlannerLimits limits = planner_util_->getCurrentLimits();
     generator_.initialise(pos,
         vel,
         goal,
         &limits,
         vsamples_);
+    ROS_ERROR("Trajectory sampled velocities: %f, %f, %f", vel_samples[0], vel_samples[1], vel_samples[2]);
+    ROS_ERROR("Velocities: %f, %f, %f, position: %f, %f, %f", vel[0], vel[1], vel[2], pos[0], pos[1], pos[2]);
     generator_.generateTrajectory(pos, vel, vel_samples, traj);
     double cost = scored_sampling_planner_.scoreTrajectory(traj, -1);
     //if the trajectory is a legal one... the check passes
@@ -277,7 +277,8 @@ namespace dwa_local_planner {
     
     // keeping the nose on the path
     if (sq_dist > forward_point_distance_ * forward_point_distance_ * cheat_factor_) {
-      alignment_costs_.setScale(pdist_scale_);
+      double resolution = planner_util_->getCostmap()->getResolution();
+      alignment_costs_.setScale(resolution * pdist_scale_ * 0.5);
       // costs for robot being aligned with path (nose on path, not ju
       alignment_costs_.setTargetPoses(global_plan_);
     } else {
@@ -296,6 +297,7 @@ namespace dwa_local_planner {
       tf::Stamped<tf::Pose>& drive_velocities,
       std::vector<geometry_msgs::Point> footprint_spec) {
 
+      //ROS_ERROR("findBestPath globalpose: %f %f %f", footprint_spec[1].x, footprint_spec[1].y, footprint_spec[1].z);
     obstacle_costs_.setFootprint(footprint_spec);
 
     //make sure that our configuration doesn't change mid-run
@@ -307,6 +309,8 @@ namespace dwa_local_planner {
     Eigen::Vector3f goal(goal_pose.pose.position.x, goal_pose.pose.position.y, tf::getYaw(goal_pose.pose.orientation));
     base_local_planner::LocalPlannerLimits limits = planner_util_->getCurrentLimits();
 
+    //ROS_ERROR("findBestPath globalpose: %f %f %f", footprint_spec[1].x, footprint_spec[1].y, footprint_spec[1].z);
+
     // prepare cost functions and generators for this run
     generator_.initialise(pos,
         vel,
@@ -317,10 +321,12 @@ namespace dwa_local_planner {
     result_traj_.cost_ = -7;
     // find best trajectory by sampling and scoring the samples
     std::vector<base_local_planner::Trajectory> all_explored;
+    
     scored_sampling_planner_.findBestTrajectory(result_traj_, &all_explored);
-
+    //ROS_ERROR("All explored cost %f velocities %f xv %f yv %f", all_explored[1].cost_, all_explored[1].thetav_, all_explored[1].xv_, all_explored[1].yv_);
     if(publish_traj_pc_)
     {
+        
         base_local_planner::MapGridCostPoint pt;
         traj_cloud_->points.clear();
         traj_cloud_->width = 0;
@@ -331,6 +337,7 @@ namespace dwa_local_planner {
         traj_cloud_->header = pcl_conversions::toPCL(header);
         for(std::vector<base_local_planner::Trajectory>::iterator t=all_explored.begin(); t != all_explored.end(); ++t)
         {
+            //ROS_ERROR("Cost  : %f ", t->cost_);
             if(t->cost_<0)
                 continue;
             // Fill out the plan
@@ -355,7 +362,7 @@ namespace dwa_local_planner {
     }
 
     // debrief stateful scoring functions
-    oscillation_costs_.updateOscillationFlags(pos, &result_traj_, planner_util_->getCurrentLimits().min_vel_trans);
+    oscillation_costs_.updateOscillationFlags(pos, &result_traj_, planner_util_->getCurrentLimits().min_trans_vel);
 
     //if we don't have a legal trajectory, we'll just command zero
     if (result_traj_.cost_ < 0) {

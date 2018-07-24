@@ -7,12 +7,9 @@ find_package(catkin REQUIRED
             rosbag
             roscpp
             std_srvs
-            tf2
-            tf2_geometry_msgs
-            tf2_ros
+            tf
             dynamic_reconfigure
             nav_msgs
-            std_srvs
         )
 
 find_package(Boost REQUIRED)
@@ -27,7 +24,7 @@ catkin_package(
         rosbag
         roscpp
         dynamic_reconfigure
-        tf2_ros
+        tf
   CATKIN_DEPENDS nav_msgs std_srvs
   INCLUDE_DIRS include
   LIBRARIES amcl_sensors amcl_map amcl_pf

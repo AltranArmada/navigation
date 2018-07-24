@@ -32,7 +32,6 @@
  * Test harness for InflationLayer for Costmap2D
  */
 #include <map>
-#include <cmath>
 
 #include <costmap_2d/costmap_2d.h>
 #include <costmap_2d/layered_costmap.h>
@@ -86,8 +85,8 @@ void validatePointInflation(unsigned int mx, unsigned int my, Costmap2D* costmap
       if (!seen[cell.index_])
       {
         seen[cell.index_] = true;
-        unsigned int dx = (cell.x_ > cell.src_x_) ? cell.x_ - cell.src_x_ : cell.src_x_ - cell.x_;
-        unsigned int dy = (cell.y_ > cell.src_y_) ? cell.y_ - cell.src_y_ : cell.src_y_ - cell.y_;
+        unsigned int dx = abs(cell.x_ - cell.src_x_);
+        unsigned int dy = abs(cell.y_ - cell.src_y_);
         double dist = hypot(dx, dy);
 
         unsigned char expected_cost = ilayer->computeCost(dist);

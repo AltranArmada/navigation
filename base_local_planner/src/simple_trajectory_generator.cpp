@@ -39,6 +39,8 @@
 
 #include <cmath>
 
+#include <ros/ros.h>
+
 #include <base_local_planner/velocity_iterator.h>
 
 namespace base_local_planner {
@@ -67,7 +69,7 @@ void SimpleTrajectoryGenerator::initialise(
   /*
    * We actually generate all velocity sample vectors here, from which to generate trajectories later on
    */
-  double max_vel_th = limits->max_vel_theta;
+  double max_vel_th = limits->max_rot_vel;
   double min_vel_th = -1.0 * max_vel_th;
   discretize_by_time_ = discretize_by_time;
   Eigen::Vector3f acc_lim = limits->getAccLimits();
@@ -161,6 +163,7 @@ bool SimpleTrajectoryGenerator::hasMoreTrajectories() {
 bool SimpleTrajectoryGenerator::nextTrajectory(Trajectory &comp_traj) {
   bool result = false;
   if (hasMoreTrajectories()) {
+    //ROS_ERROR("Next Trajectory has more trajectories");
     if (generateTrajectory(
         pos_,
         vel_,
@@ -188,14 +191,19 @@ bool SimpleTrajectoryGenerator::generateTrajectory(
   //trajectory might be reused so we'll make sure to reset it
   traj.resetPoints();
 
+//ROS_ERROR("Trajectory sampled velocities: %f, %f, %f", sample_target_vel[0], sample_target_vel[1], sample_target_vel[2]);
+//ROS_ERROR("Velocities: %f, %f, %f, position: %f, %f, %f", vel[0], vel[1], vel[2], pos[0], pos[1], pos[2]);
+
   // make sure that the robot would at least be moving with one of
   // the required minimum velocities for translation and rotation (if set)
-  if ((limits_->min_vel_trans >= 0 && vmag + eps < limits_->min_vel_trans) &&
-      (limits_->min_vel_theta >= 0 && fabs(sample_target_vel[2]) + eps < limits_->min_vel_theta)) {
+  if ((limits_->min_trans_vel >= 0 && vmag + eps < limits_->min_trans_vel) &&
+      (limits_->min_rot_vel >= 0 && fabs(sample_target_vel[2]) + eps < limits_->min_rot_vel)) {
+        //ROS_DEBUG("Robot cannot move with one of the required minimum velocities. \n min_trans_vel :%f min_rot_vel :%f vmag :%f, rot lim :%f", limits_->min_trans_vel, limits_->min_rot_vel, vmag, fabs(sample_target_vel[2]));
     return false;
   }
   // make sure we do not exceed max diagonal (x+y) translational velocity (if set)
-  if (limits_->max_vel_trans >=0 && vmag - eps > limits_->max_vel_trans) {
+  if (limits_->max_trans_vel >=0 && vmag - eps > limits_->max_trans_vel) {
+    ROS_DEBUG("Robot exceeds max diagonal and translational velocities");
     return false;
   }
 
@@ -209,10 +217,6 @@ bool SimpleTrajectoryGenerator::generateTrajectory(
     num_steps =
         ceil(std::max(sim_time_distance / sim_granularity_,
             sim_time_angle    / angular_sim_granularity_));
-  }
-
-  if (num_steps == 0) {
-    return false;
   }
 
   //compute a timestep
@@ -243,7 +247,7 @@ bool SimpleTrajectoryGenerator::generateTrajectory(
     if (continued_acceleration_) {
       //calculate velocities
       loop_vel = computeNewVelocities(sample_target_vel, loop_vel, limits_->getAccLimits(), dt);
-      //ROS_WARN_NAMED("Generator", "Flag: %d, Loop_Vel %f, %f, %f", continued_acceleration_, loop_vel[0], loop_vel[1], loop_vel[2]);
+      ROS_WARN_NAMED("Generator", "Flag: %d, Loop_Vel %f, %f, %f", continued_acceleration_, loop_vel[0], loop_vel[1], loop_vel[2]);
     }
 
     //update the position of the robot using the velocities passed in
@@ -251,7 +255,7 @@ bool SimpleTrajectoryGenerator::generateTrajectory(
 
   } // end for simulation steps
 
-  return true; // trajectory has at least one point
+  return num_steps > 0; // true if trajectory has at least one point
 }
 
 Eigen::Vector3f SimpleTrajectoryGenerator::computeNewPositions(const Eigen::Vector3f& pos,
@@ -264,7 +268,7 @@ Eigen::Vector3f SimpleTrajectoryGenerator::computeNewPositions(const Eigen::Vect
 }
 
 /**
- * change vel using acceleration limits to converge towards sample_target-vel
+ * cheange vel using acceleration limits to converge towards sample_target-vel
  */
 Eigen::Vector3f SimpleTrajectoryGenerator::computeNewVelocities(const Eigen::Vector3f& sample_target_vel,
     const Eigen::Vector3f& vel, Eigen::Vector3f acclimits, double dt) {

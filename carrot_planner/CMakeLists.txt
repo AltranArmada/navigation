@@ -4,18 +4,18 @@ project(carrot_planner)
 find_package(catkin REQUIRED
         COMPONENTS
             roscpp
+            tf
             nav_core
             costmap_2d
             base_local_planner
             pluginlib
-            tf2
         )
 
 include_directories(
     include 
     ${catkin_INCLUDE_DIRS}
     )
-add_definitions(${EIGEN3_DEFINITIONS})
+add_definitions(${EIGEN_DEFINITIONS})
 
 catkin_package(
     INCLUDE_DIRS include

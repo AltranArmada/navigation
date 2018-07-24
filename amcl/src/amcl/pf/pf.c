@@ -39,6 +39,8 @@
 // with samples in them.
 static int pf_resample_limit(pf_t *pf, int k);
 
+// Re-compute the cluster statistics for a sample set
+static void pf_cluster_stats(pf_t *pf, pf_sample_set_t *set);
 
 
 // Create a new filter
@@ -522,7 +524,7 @@ void pf_cluster_stats(pf_t *pf, pf_sample_set_t *set)
 
     // Get the cluster label for this sample
     cidx = pf_kdtree_get_cluster(set->kdtree, sample->pose);
-    assert(cidx >= 0);
+    //assert(cidx >= 0);
     if (cidx >= set->cluster_max_count)
       continue;
     if (cidx + 1 > set->cluster_count)

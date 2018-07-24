@@ -53,7 +53,7 @@
 #include <costmap_2d/costmap_2d.h>
 #include <nav_msgs/GetPlan.h>
 
-#include <pluginlib/class_loader.hpp>
+#include <pluginlib/class_loader.h>
 #include <std_srvs/Empty.h>
 
 #include <dynamic_reconfigure/server.h>
@@ -163,8 +163,6 @@ namespace move_base {
       void executeCb(const move_base_msgs::MoveBaseGoalConstPtr& move_base_goal);
 
       bool isQuaternionValid(const geometry_msgs::Quaternion& q);
-
-      bool getRobotPose(tf::Stamped<tf::Pose>& global_posee, costmap_2d::Costmap2DROS* costmap);
 
       double distance(const geometry_msgs::PoseStamped& p1, const geometry_msgs::PoseStamped& p2);
 

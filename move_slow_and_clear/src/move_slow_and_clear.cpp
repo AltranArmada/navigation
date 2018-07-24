@@ -38,7 +38,8 @@
 #include <pluginlib/class_list_macros.h>
 #include <costmap_2d/obstacle_layer.h>
 
-PLUGINLIB_EXPORT_CLASS(move_slow_and_clear::MoveSlowAndClear, nav_core::RecoveryBehavior)
+PLUGINLIB_DECLARE_CLASS(move_slow_and_clear, MoveSlowAndClear, move_slow_and_clear::MoveSlowAndClear,
+    nav_core::RecoveryBehavior)
 
 namespace move_slow_and_clear
 {

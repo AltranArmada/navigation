@@ -18,16 +18,15 @@ find_package(catkin REQUIRED
         visualization_msgs
         )
 
-find_package(Eigen3 REQUIRED)
-find_package(PCL REQUIRED COMPONENT common)
-remove_definitions(-DDISABLE_LIBUSB-1.0)
+find_package(Eigen REQUIRED)
+find_package(PCL REQUIRED)
 include_directories(
     include
     ${catkin_INCLUDE_DIRS}
-    ${EIGEN3_INCLUDE_DIRS}
+    ${EIGEN_INCLUDE_DIRS}
     ${PCL_INCLUDE_DIRS}
 )
-add_definitions(${EIGEN3_DEFINITIONS})
+add_definitions(${EIGEN_DEFINITIONS})
 
 
 # services

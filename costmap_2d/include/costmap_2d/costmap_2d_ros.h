@@ -46,7 +46,7 @@
 #include <geometry_msgs/Polygon.h>
 #include <geometry_msgs/PolygonStamped.h>
 #include <dynamic_reconfigure/server.h>
-#include <pluginlib/class_loader.hpp>
+#include <pluginlib/class_loader.h>
 
 class SuperValue : public XmlRpc::XmlRpcValue
 {
@@ -121,18 +121,6 @@ public:
    * @return True if the pose was set successfully, false otherwise
    */
   bool getRobotPose(tf::Stamped<tf::Pose>& global_pose) const;
-
-  /** @brief Returns costmap name */
-  std::string getName() const
-    {
-      return name_;
-    }
-
-  /** @brief Returns the delay in transform (tf) data that is tolerable in seconds */
-  double getTransformTolerance() const
-    {
-      return transform_tolerance_;
-    }
 
   /** @brief Return a pointer to the "master" costmap which receives updates from all the layers.
    *

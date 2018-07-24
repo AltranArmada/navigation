@@ -87,7 +87,7 @@ namespace base_local_planner {
     for (std::vector<TrajectoryCostFunction*>::iterator loop_critic = critics_.begin(); loop_critic != critics_.end(); ++loop_critic) {
       TrajectoryCostFunction* loop_critic_p = *loop_critic;
       if (loop_critic_p->prepare() == false) {
-        ROS_WARN("A scoring function failed to prepare");
+       // ROS_ERROR("A scoring function failed to prepare");
         return false;
       }
     }
@@ -100,6 +100,7 @@ namespace base_local_planner {
         gen_success = gen_->nextTrajectory(loop_traj);
         if (gen_success == false) {
           // TODO use this for debugging
+         // ROS_ERROR("Could not generate a trajectory");
           continue;
         }
         loop_traj_cost = scoreTrajectory(loop_traj, best_traj_cost);
@@ -132,7 +133,7 @@ namespace base_local_planner {
           traj.addPoint(px, py, pth);
         }
       }
-      ROS_DEBUG("Evaluated %d trajectories, found %d valid", count, count_valid);
+      ROS_ERROR("Evaluated %d trajectories, found %d valid", count, count_valid);
       if (best_traj_cost >= 0) {
         // do not try fallback generators
         break;

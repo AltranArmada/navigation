@@ -18,7 +18,6 @@ find_package(catkin REQUIRED
             rospy
             std_msgs
             tf
-            tf2_geometry_msgs
             voxel_grid
         )
 
@@ -27,16 +26,15 @@ find_package(Boost REQUIRED
         thread
         )
 
-find_package(Eigen3 REQUIRED)
-find_package(PCL REQUIRED COMPONENTS common)
-remove_definitions(-DDISABLE_LIBUSB-1.0)
+find_package(Eigen REQUIRED)
+find_package(PCL REQUIRED)
 include_directories(
     include
     ${catkin_INCLUDE_DIRS}
-    ${EIGEN3_INCLUDE_DIRS}
+    ${EIGEN_INCLUDE_DIRS}
     ${PCL_INCLUDE_DIRS}
 )
-add_definitions(${EIGEN3_DEFINITIONS})
+add_definitions(${EIGEN_DEFINITIONS})
 
 catkin_python_setup()
 
@@ -100,11 +98,10 @@ add_library(base_local_planner
 	src/simple_scored_sampling_planner.cpp
 	src/simple_trajectory_generator.cpp
 	src/trajectory.cpp
-	src/twirling_cost_function.cpp
 	src/voxel_grid_model.cpp)
 add_dependencies(base_local_planner base_local_planner_gencfg)
-add_dependencies(base_local_planner base_local_planner_generate_messages_cpp)
-add_dependencies(base_local_planner nav_msgs_generate_messages_cpp)
+add_dependencies(base_local_planner base_local_planner_gencpp)
+add_dependencies(base_local_planner nav_msgs_gencpp)
 target_link_libraries(base_local_planner
     ${catkin_LIBRARIES}
     ${PCL_LIBRARIES}
@@ -151,6 +148,7 @@ if(CATKIN_ENABLE_TESTING)
   target_link_libraries(base_local_planner_utest
       base_local_planner trajectory_planner_ros
       )
+
 
   catkin_add_gtest(line_iterator
       test/line_iterator_test.cpp)

@@ -50,8 +50,7 @@
 #include <base_local_planner/goal_functions.h>
 #include <nav_msgs/Path.h>
 
-#include <nav_core/parameter_magic.h>
-#include <tf2/utils.h>
+
 
 //register this planner as a BaseLocalPlanner plugin
 PLUGINLIB_EXPORT_CLASS(base_local_planner::TrajectoryPlannerROS, nav_core::BaseLocalPlanner)
@@ -120,7 +119,14 @@ namespace base_local_planner {
       private_nh.param("xy_goal_tolerance", xy_goal_tolerance_, 0.10);
       private_nh.param("acc_lim_x", acc_lim_x_, 2.5);
       private_nh.param("acc_lim_y", acc_lim_y_, 2.5);
-      private_nh.param("acc_lim_theta", acc_lim_theta_, 3.2);
+      //this was improperly set as acc_lim_th -- TODO: remove this when we get to J turtle
+      acc_lim_theta_ = 3.2;
+      if (private_nh.hasParam("acc_lim_th"))
+      {
+        ROS_WARN("%s/acc_lim_th should be acc_lim_theta, this param will be removed in J-turtle", private_nh.getNamespace().c_str());
+        private_nh.param("acc_lim_th", acc_lim_theta_, 3.2);
+      }
+      private_nh.param("acc_lim_theta", acc_lim_theta_, acc_lim_theta_);
 
       private_nh.param("stop_time_buffer", stop_time_buffer, 0.2);
 
@@ -169,7 +175,7 @@ namespace base_local_planner {
 
       bool meter_scoring;
       if ( ! private_nh.hasParam("meter_scoring")) {
-        ROS_WARN("Trajectory Rollout planner initialized with param meter_scoring not set. Set it to true to make your settings robust against changes of costmap resolution.");
+        ROS_WARN("Trajectory Rollout planner initialized with param meter_scoring not set. Set it to true to make your settins robust against changes of costmap resolution.");
       } else {
         private_nh.param("meter_scoring", meter_scoring, false);
 
@@ -180,7 +186,7 @@ namespace base_local_planner {
           pdist_scale *= resolution;
           occdist_scale *= resolution;
         } else {
-          ROS_WARN("Trajectory Rollout planner initialized with param meter_scoring set to false. Set it to true to make your settings robust against changes of costmap resolution.");
+          ROS_WARN("Trajectory Rollout planner initialized with param meter_scoring set to false. Set it to true to make your settins robust against changes of costmap resolution.");
         }
       }
 
@@ -196,10 +202,7 @@ namespace base_local_planner {
       private_nh.param("max_rotational_vel", max_rotational_vel, 1.0);
       max_vel_th_ = max_rotational_vel;
       min_vel_th_ = -1.0 * max_rotational_vel;
-
-      min_in_place_vel_th_ = nav_core::loadParameterWithDeprecation(private_nh,
-                                                                    "min_in_place_vel_theta",
-                                                                    "min_in_place_rotational_vel", 0.4);
+      private_nh.param("min_in_place_rotational_vel", min_in_place_vel_th_, 0.4);
       reached_goal_ = false;
       backup_vel = -0.1;
       if(private_nh.getParam("backup_vel", backup_vel))
@@ -291,7 +294,8 @@ namespace base_local_planner {
     double vy = sign(robot_vel.getOrigin().y()) * std::max(0.0, (fabs(robot_vel.getOrigin().y()) - acc_lim_y_ * sim_period_));
 
     double vel_yaw = tf::getYaw(robot_vel.getRotation());
-    double vth = sign(vel_yaw) * std::max(0.0, (fabs(vel_yaw) - acc_lim_theta_ * sim_period_));
+    //double vth = sign(vel_yaw) * std::max(0.0, (fabs(vel_yaw) - acc_lim_theta_ * sim_period_));
+    double vth = 0;
 
     //we do want to check whether or not the command is valid
     double yaw = tf::getYaw(global_pose.getRotation());
@@ -320,25 +324,27 @@ namespace base_local_planner {
     cmd_vel.linear.y = 0;
     double ang_diff = angles::shortest_angular_distance(yaw, goal_th);
 
-    double v_theta_samp = ang_diff > 0.0 ? std::min(max_vel_th_,
-        std::max(min_in_place_vel_th_, ang_diff)) : std::max(min_vel_th_,
-        std::min(-1.0 * min_in_place_vel_th_, ang_diff));
+    //double v_theta_samp = ang_diff > 0.0 ? std::min(max_vel_th_,
+    //    std::max(min_in_place_vel_th_, ang_diff)) : std::max(min_vel_th_,
+    //    std::min(-1.0 * min_in_place_vel_th_, ang_diff));
+
+    double v_theta_samp = 0;
 
     //take the acceleration limits of the robot into account
     double max_acc_vel = fabs(vel_yaw) + acc_lim_theta_ * sim_period_;
     double min_acc_vel = fabs(vel_yaw) - acc_lim_theta_ * sim_period_;
 
-    v_theta_samp = sign(v_theta_samp) * std::min(std::max(fabs(v_theta_samp), min_acc_vel), max_acc_vel);
+    //v_theta_samp = sign(v_theta_samp) * std::min(std::max(fabs(v_theta_samp), min_acc_vel), max_acc_vel);
 
     //we also want to make sure to send a velocity that allows us to stop when we reach the goal given our acceleration limits
     double max_speed_to_stop = sqrt(2 * acc_lim_theta_ * fabs(ang_diff)); 
 
-    v_theta_samp = sign(v_theta_samp) * std::min(max_speed_to_stop, fabs(v_theta_samp));
+   // v_theta_samp = sign(v_theta_samp) * std::min(max_speed_to_stop, fabs(v_theta_samp));
 
     // Re-enforce min_in_place_vel_th_.  It is more important than the acceleration limits.
-    v_theta_samp = v_theta_samp > 0.0
-      ? std::min( max_vel_th_, std::max( min_in_place_vel_th_, v_theta_samp ))
-      : std::max( min_vel_th_, std::min( -1.0 * min_in_place_vel_th_, v_theta_samp ));
+    //v_theta_samp = v_theta_samp > 0.0
+    //  ? std::min( max_vel_th_, std::max( min_in_place_vel_th_, v_theta_samp ))
+    //  : std::max( min_vel_th_, std::min( -1.0 * min_in_place_vel_th_, v_theta_samp ));
 
     //we still want to lay down the footprint of the robot and check if the action is legal
     bool valid_cmd = tc_->checkTrajectory(global_pose.getOrigin().getX(), global_pose.getOrigin().getY(), yaw, 
@@ -412,12 +418,13 @@ namespace base_local_planner {
     if(transformed_plan.empty())
       return false;
 
-    const geometry_msgs::PoseStamped& goal_point = transformed_plan.back();
+    tf::Stamped<tf::Pose> goal_point;
+    tf::poseStampedMsgToTF(transformed_plan.back(), goal_point);
     //we assume the global goal is the last point in the global plan
-    const double goal_x = goal_point.pose.position.x;
-    const double goal_y = goal_point.pose.position.y;
+    double goal_x = goal_point.getOrigin().getX();
+    double goal_y = goal_point.getOrigin().getY();
 
-    const double yaw = tf2::getYaw(goal_point.pose.orientation);
+    double yaw = tf::getYaw(goal_point.getRotation());
 
     double goal_th = yaw;
 
@@ -511,15 +518,14 @@ namespace base_local_planner {
     for (unsigned int i = 0; i < path.getPointsSize(); ++i) {
       double p_x, p_y, p_th;
       path.getPoint(i, p_x, p_y, p_th);
+      tf::Stamped<tf::Pose> p =
+          tf::Stamped<tf::Pose>(tf::Pose(
+              tf::createQuaternionFromYaw(p_th),
+              tf::Point(p_x, p_y, 0.0)),
+              ros::Time::now(),
+              global_frame_);
       geometry_msgs::PoseStamped pose;
-      pose.header.frame_id = global_frame_;
-      pose.header.stamp = ros::Time::now();
-      pose.pose.position.x = p_x;
-      pose.pose.position.y = p_y;
-      pose.pose.position.z = 0.0;
-      tf2::Quaternion q;
-      q.setRPY(0, 0, p_th);
-      tf2::convert(q, pose.pose.orientation);
+      tf::poseStampedTFToMsg(p, pose);
       local_plan.push_back(pose);
     }
 

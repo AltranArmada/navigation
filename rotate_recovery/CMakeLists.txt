@@ -12,13 +12,13 @@ find_package(catkin REQUIRED
             base_local_planner
         )
 
-find_package(Eigen3 REQUIRED)
+find_package(Eigen REQUIRED)
 include_directories(
     include
     ${catkin_INCLUDE_DIRS}
-    ${EIGEN3_INCLUDE_DIRS}
+    ${EIGEN_INCLUDE_DIRS}
 )
-add_definitions(${EIGEN3_DEFINITIONS})
+add_definitions(${EIGEN_DEFINITIONS})
 
 catkin_package(
     INCLUDE_DIRS include

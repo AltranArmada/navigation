@@ -86,6 +86,7 @@ namespace base_local_planner{
         double resolution = costmap_.getResolution();
         gdist_scale_ *= resolution;
         pdist_scale_ *= resolution;
+        occdist_scale_ *= resolution;
       }
 
       oscillation_reset_dist_ = config.oscillation_reset_dist;
@@ -274,6 +275,7 @@ namespace base_local_planner{
 
       //check the point on the trajectory for legality
       double footprint_cost = footprintCost(x_i, y_i, theta_i);
+    
 
       //if the footprint hits an obstacle this trajectory is invalid
       if(footprint_cost < 0){
@@ -368,19 +370,32 @@ namespace base_local_planner{
   }
 
   double TrajectoryPlanner::headingDiff(int cell_x, int cell_y, double x, double y, double heading){
+    double heading_diff = DBL_MAX;
     unsigned int goal_cell_x, goal_cell_y;
+    const double v2_x = cos(heading);
+    const double v2_y = sin(heading);
 
-    // find a clear line of sight from the robot's cell to a farthest point on the path
+    //find a clear line of sight from the robot's cell to a point on the path
     for (int i = global_plan_.size() - 1; i >=0; --i) {
       if (costmap_.worldToMap(global_plan_[i].pose.position.x, global_plan_[i].pose.position.y, goal_cell_x, goal_cell_y)) {
         if (lineCost(cell_x, goal_cell_x, cell_y, goal_cell_y) >= 0) {
           double gx, gy;
           costmap_.mapToWorld(goal_cell_x, goal_cell_y, gx, gy);
-          return fabs(angles::shortest_angular_distance(heading, atan2(gy - y, gx - x)));
+          double v1_x = gx - x;
+          double v1_y = gy - y;
+
+          double perp_dot = v1_x * v2_y - v1_y * v2_x;
+          double dot = v1_x * v2_x + v1_y * v2_y;
+
+          //get the signed angle
+          double vector_angle = atan2(perp_dot, dot);
+
+          heading_diff = fabs(vector_angle);
+          return heading_diff;
         }
       }
     }
-    return DBL_MAX;
+    return heading_diff;
   }
 
   //calculate the cost of a ray-traced line
@@ -503,7 +518,8 @@ namespace base_local_planner{
     Trajectory t;
 
     double cost = scoreTrajectory(x, y, theta, vx, vy, vtheta, vx_samp, vy_samp, vtheta_samp);
-
+    ROS_ERROR("Trajectory sampled velocities: %f, %f, %f, cost: %f", vx_samp, vy_samp, vtheta_samp, cost);
+    ROS_ERROR("Velocities: %f, %f, %f, position: %f, %f, %f", vx, vy, vtheta, x, y, theta);
     //if the trajectory is a legal one... the check passes
     if(cost >= 0) {
       return true;
@@ -517,6 +533,8 @@ namespace base_local_planner{
   double TrajectoryPlanner::scoreTrajectory(double x, double y, double theta, double vx, double vy,
       double vtheta, double vx_samp, double vy_samp, double vtheta_samp) {
     Trajectory t;
+    ROS_ERROR("Trajectory sampled velocities: %f, %f, %f", vx_samp, vy_samp, vtheta_samp);
+    ROS_ERROR("Velocities: %f, %f, %f, position: %f, %f, %f", vx, vy, vtheta, x, y, theta);
     double impossible_cost = path_map_.obstacleCosts();
     generateTrajectory(x, y, theta,
                        vx, vy, vtheta,
@@ -906,7 +924,8 @@ namespace base_local_planner{
       tf::Stamped<tf::Pose>& drive_velocities){
 
     Eigen::Vector3f pos(global_pose.getOrigin().getX(), global_pose.getOrigin().getY(), tf::getYaw(global_pose.getRotation()));
-    Eigen::Vector3f vel(global_vel.getOrigin().getX(), global_vel.getOrigin().getY(), tf::getYaw(global_vel.getRotation()));
+    //Eigen::Vector3f vel(global_vel.getOrigin().getX(), global_vel.getOrigin().getY(), tf::getYaw(global_vel.getRotation()));
+    Eigen::Vector3f vel(global_vel.getOrigin().getX(), global_vel.getOrigin().getY(), 0.0);
 
     //reset the map for new operations
     path_map_.resetPathDist();

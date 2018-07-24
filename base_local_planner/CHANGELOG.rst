@@ -2,52 +2,62 @@
 Changelog for package base_local_planner
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-1.15.2 (2018-03-22)
--------------------
-* Merge pull request `#673 <https://github.com/ros-planning/navigation/issues/673>`_ from ros-planning/email_update_lunar
-  update maintainer email (lunar)
-* CostmapModel: Make lineCost and pointCost public (`#658 <https://github.com/ros-planning/navigation/issues/658>`_)
-  Make the methods `lineCost` and `pointCost` of the CostmapModel class
-  public so they can be used outside of the class.
-  Both methods are not changing the instance, so this should not cause any
-  problems.  To emphasise their constness, add the actual `const` keyword.
-* Merge pull request `#649 <https://github.com/ros-planning/navigation/issues/649>`_ from aaronhoy/lunar_add_ahoy
+1.12.15 (2018-03-20)
+--------------------
+* Merge pull request `#671 <https://github.com/ros-planning/navigation/issues/671>`_ from ros-planning/email_update_indigo
+  update maintainer email (indigo)
+* Merge pull request `#647 <https://github.com/ros-planning/navigation/issues/647>`_ from aaronhoy/indigo_add_ahoy
   Add myself as a maintainer.
-* Contributors: Aaron Hoy, Felix Widmaier, Michael Ferguson
+* Contributors: Aaron Hoy, Michael Ferguson
 
-1.15.1 (2017-08-14)
--------------------
-
-1.15.0 (2017-08-07)
--------------------
-* set message_generation build and runtime dependency
-* convert packages to format2
-* cleaner logic, fixes `#156 <https://github.com/ros-planning/navigation/issues/156>`_
-* Merge pull request `#596 <https://github.com/ros-planning/navigation/issues/596>`_ from ros-planning/lunar_548
-* Add cost function to prevent unnecessary spinning
+1.12.14 (2017-12-19)
+--------------------
 * Fix CMakeLists + package.xmls (`#548 <https://github.com/ros-planning/navigation/issues/548>`_)
-* add missing deps on libpcl
-* import only PCL common
-* pcl proagate -lQt5::Widgets flag so we need to find_package Qt5Widgets (`#578 <https://github.com/ros-planning/navigation/issues/578>`_)
 * make rostest in CMakeLists optional (`ros/rosdistro#3010 <https://github.com/ros/rosdistro/issues/3010>`_)
-* remove GCC warnings
-* Contributors: Lukas Bulwahn, Martin Günther, Michael Ferguson, Mikael Arguedas, Morgan Quigley, Vincent Rabaud, lengly
+* Contributors: Lukas Bulwahn, Martin Günther
 
-1.14.0 (2016-05-20)
+1.12.13 (2016-08-15)
+--------------------
+
+1.12.12 (2016-06-24)
+--------------------
+
+1.12.11 (2016-06-08)
+--------------------
+
+1.12.10 (2016-05-27)
+--------------------
+
+1.12.9 (2016-05-26)
 -------------------
 
-1.13.1 (2015-10-29)
+1.12.8 (2016-05-16)
+-------------------
+
+1.12.7 (2016-01-05)
+-------------------
+
+1.12.6 (2016-01-02)
+-------------------
+
+1.12.5 (2015-10-29)
 -------------------
 * base_local_planner: some fixes in goal_functions
-* Merge pull request `#348 <https://github.com/ros-planning/navigation/issues/348>`_ from mikeferguson/trajectory_planner_fixes
-* fix stuck_left/right calculation
-* fix calculation of heading diff
-* Contributors: Gael Ecorchard, Michael Ferguson
+* Contributors: Gael Ecorchard
 
-1.13.0 (2015-03-17)
+1.12.4 (2015-06-03)
 -------------------
-* remove previously deprecated param
+* fix stuck_left/right calculation
 * Contributors: Michael Ferguson
+
+1.12.3 (2015-04-30)
+-------------------
+
+1.12.2 (2015-03-31)
+-------------------
+
+1.12.1 (2015-03-14)
+-------------------
 
 1.12.0 (2015-02-04)
 -------------------
